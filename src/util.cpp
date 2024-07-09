@@ -4,9 +4,35 @@
 #include <math.h>
 #include <stdarg.h>
 
-#if LIN
+#if LIN || APL
 #include <dlfcn.h>
 #include <gtk/gtk.h>
+#endif
+
+#if APL
+#include <CoreFoundation/CoreFoundation.h>
+#endif
+
+#if APL
+//==============================================================
+//==============================================================
+// Mac specific: this converts file paths from HFS (which we get from the SDK) to Unix (which the OS wants).
+// See this for more info:
+// http://www.xsquawkbox.net/xpsdk/mediawiki/FilePathsAndMacho
+static int ConvertPath(const char * inPath, char * outPath, int outPathMaxLen) {
+
+  CFStringRef inStr = CFStringCreateWithCString(kCFAllocatorDefault, inPath, kCFStringEncodingMacRoman);
+  if (inStr == NULL)
+    return -1;
+  CFURLRef url = CFURLCreateWithFileSystemPath(kCFAllocatorDefault, inStr, kCFURLHFSPathStyle, 0);
+  CFStringRef outStr = CFURLCopyFileSystemPath(url, kCFURLPOSIXPathStyle);
+  if (!CFStringGetCString(outStr, outPath, outPathMaxLen, kCFURLPOSIXPathStyle))
+    return -1;
+  CFRelease(outStr);
+  CFRelease(url);
+  CFRelease(inStr);
+  return 0;
+}
 #endif
 
 //==============================================================
@@ -31,6 +57,14 @@ void buildAssetFilename(char pName[MAX_PATH], const char* pFileName)
     if (*slash == '\\') *slash = dirchar;
     ++slash;
   }
+#if APL
+  // Convert the path for Mac
+  char convertedPath[MAX_PATH];
+  if (ConvertPath(pName, convertedPath, sizeof(convertedPath)) == 0)
+  {
+    strncpy(pName, convertedPath, MAX_PATH);
+  }
+#endif
 }
 
 //==============================================================
@@ -41,10 +75,12 @@ void playSound(const char* pFileName)
 
   buildAssetFilename(assetName, pFileName);
 
+  LOG("HOI: %s\n", (const char*)assetName);
+
 #ifdef USE_OPENAL
   g_sound.play(assetName);
 #else
-  PlaySound(assetName, NULL, SND_ASYNC);
+  //PlaySound(assetName, NULL, SND_ASYNC);
 #endif
 }
 
@@ -162,7 +198,7 @@ void delayMS(uint32_t valueMS)
 #endif
 }
 
-#if LIN
+#if LIN || APL
 //==============================================================
 //==============================================================
 bool IsDebuggerPresent()
@@ -172,46 +208,36 @@ bool IsDebuggerPresent()
 
 #endif
 
-#if LIN
+#if APL
+int clock_gettime(clockid_t clk_id, struct timespec *tp) {
+  static mach_timebase_info_data_t timebase_info;
+  uint64_t time;
+
+  if (timebase_info.denom == 0) {
+    mach_timebase_info(&timebase_info);
+  }
+
+  time = mach_absolute_time();
+  double nseconds = (double)time * (double)timebase_info.numer / (double)timebase_info.denom;
+
+  tp->tv_sec = nseconds / 1e9;
+  tp->tv_nsec = nseconds - (tp->tv_sec * 1e9);
+
+  return 0;
+}
+#endif
+
+#if LIN || APL
 //==============================================================
 //==============================================================
 uint32_t GetTickCount()
 {
-  enum
-  {
-#ifdef CLOCK_BOOTTIME
-    boot_time_id = CLOCK_BOOTTIME
-#else
-    boot_time_id = 7
-#endif
-  };
   struct timespec spec;
-  clock_gettime(boot_time_id, &spec);
+  clock_gettime((clockid_t)7, &spec);
   return (uint32_t)(((uint64_t)spec.tv_sec) * 1000 + ((uint64_t)spec.tv_nsec) / 1000000);
 }
 #endif
 
-#if APL
-//==============================================================
-//==============================================================
-// Mac specific: this converts file paths from HFS (which we get from the SDK) to Unix (which the OS wants).
-// See this for more info:
-// http://www.xsquawkbox.net/xpsdk/mediawiki/FilePathsAndMacho
-static int ConvertPath(const char * inPath, char * outPath, int outPathMaxLen) {
-
-  CFStringRef inStr = CFStringCreateWithCString(kCFAllocatorDefault, inPath, kCFStringEncodingMacRoman);
-  if (inStr == NULL)
-    return -1;
-  CFURLRef url = CFURLCreateWithFileSystemPath(kCFAllocatorDefault, inStr, kCFURLHFSPathStyle, 0);
-  CFStringRef outStr = CFURLCopyFileSystemPath(url, kCFURLPOSIXPathStyle);
-  if (!CFStringGetCString(outStr, outPath, outPathMaxLen, kCFURLPOSIXPathStyle))
-    return -1;
-  CFRelease(outStr);
-  CFRelease(url);
-  CFRelease(inStr);
-  return 0;
-}
-#endif
 
 #if IBM
 //==============================================================
@@ -235,7 +261,7 @@ extern void getClipboardText(char str[1024])
 }
 #endif
 
-#if LIN
+#if LIN || APL
 //==============================================================
 //==============================================================
 extern void getClipboardText(char str[1024])
@@ -289,7 +315,7 @@ int smallestPowerOfTwo(int value, int minValue)
 //==============================================================
 //==============================================================
 //subPath = "assets\\fonts"
-std::vector<std::filesystem::path> getFontPaths(const char* subPath, bool directories)  
+std::vector<std::filesystem::path> getFontPaths(const char* subPath, bool directories)
 {
   char dirName[MAX_PATH];
   buildAssetFilename(dirName, subPath);

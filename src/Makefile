@@ -24,13 +24,14 @@ SOURCES = \
     fontwtfos.cpp \
     ipinputwidget.cpp
 
-LIBS = -lopenal 
+LIBS = -lopenal -framework XPLM -framework XPWidgets -framework OpenGL -framework GLUT -lc++
 
 INCLUDES = \
 	-I$(SRC_BASE)/SDK/CHeaders/XPLM \
-	-I$(SRC_BASE)/SDK/CHeaders/Widgets 
+	-I$(SRC_BASE)/SDK/CHeaders/Widgets \
+	-I/usr/local/opt/openal-soft/include
 
-DEFINES = -DXPLM200=1 -DXPLM210=1 -DXPLM300=1 -DXPLM301=1 -DXPLM302=1 -DXPLM303=1 -DAPL=0 -DIBM=0 -DLIN=1
+DEFINES = -DXPLM200=1 -DXPLM210=1 -DXPLM300=1 -DXPLM301=1 -DXPLM302=1 -DXPLM303=1 -DAPL=1 -DIBM=0 -DLIN=0
 
 ############################################################################
 
@@ -47,7 +48,7 @@ CXXOBJECTS64	:= $(patsubst %.cpp, $(BUILDDIR)/obj64/%.o, $(CXXSOURCES))
 ALL_DEPS64		:= $(sort $(CDEPS64) $(CXXDEPS64))
 ALL_OBJECTS64	:= $(sort $(COBJECTS64) $(CXXOBJECTS64))
 
-CFLAGS := $(DEFINES) $(INCLUDES) -fPIC -fvisibility=hidden `pkg-config --cflags gtk+-3.0` --std=c++17
+CFLAGS := $(DEFINES) $(INCLUDES) -fPIC -fvisibility=hidden `pkg-config --cflags --libs gtk+-3.0` --std=c++17
 
 
 # Phony directive tells make that these are "virtual" targets, even if a file named "clean" exists.
@@ -60,13 +61,13 @@ CFLAGS := $(DEFINES) $(INCLUDES) -fPIC -fvisibility=hidden `pkg-config --cflags 
 
 # Target rules - these just induce the right .xpl files.
 
-$(TARGET): $(BUILDDIR)/$(TARGET)/64/lin.xpl
+$(TARGET): $(BUILDDIR)/$(TARGET)/64/mac.xpl
 
 
-$(BUILDDIR)/$(TARGET)/64/lin.xpl: $(ALL_OBJECTS64)
+$(BUILDDIR)/$(TARGET)/64/mac.xpl: $(ALL_OBJECTS64)
 	@echo Linking $@
 	mkdir -p $(dir $@)
-	gcc -m64 -static-libgcc -shared -Wl,--version-script=exports.txt -o $@ $(ALL_OBJECTS64) $(LIBS)
+	gcc -L/usr/local/opt/openal-soft/lib -F$(SRC_BASE)/SDK/Libraries/Mac -m64 -shared -Wl -o $@ $(ALL_OBJECTS64) $(LIBS) $(CFLAGS)
 
 # Compiler rules
 
@@ -99,5 +100,4 @@ clean:
 # header is changed, the primary header had it before (and is unchanged)
 # so that is in the dependency file too.
 -include $(ALL_DEPS64)
-
 

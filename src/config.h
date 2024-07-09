@@ -1,6 +1,6 @@
 #pragma once
 
-//#if IBM => WinAPI 
+//#if IBM => WinAPI
 //#if LIN => Linux
 
 #define ENABLE_LOG
@@ -33,9 +33,9 @@
 #include <mmsystem.h> // Include mmsystem.h for PlaySound
 //do not use OpanAL on windows to avoid requirements of OpenAL installation
 //#define USE_OPENAL
-#elif LIN
+#elif LIN || APL
 #include <unistd.h>
-#define USE_OPENAL
+//#define USE_OPENAL
 #endif
 
 
@@ -52,23 +52,27 @@
 #include <fstream>
 //#include <functional>
 
-
+#if APL
+#include <OpenGL/gl.h>
+#include <OpenGL/glu.h>
+#else
 #include <GL/gl.h>
 #include <GL/glu.h>
+#endif
 
-#include "mINI\ini.h"
+#include "mINI/ini.h"
 
-#if LIN
+#if LIN || APL
 #define MAX_PATH 1260
 #include <time.h>
 #include <cmath>
 #endif
 
-#if LIN
+#if LIN || APL
 #include <sys/types.h>
 #include <fcntl.h>
-#include <errno.h> 
-#include <termios.h> 
+#include <errno.h>
+#include <termios.h>
 #include <unistd.h>
 
 #include <arpa/inet.h>

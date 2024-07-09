@@ -33,9 +33,15 @@ extern std::string toLower(const std::string& str);
 
 extern bool validateIpAddress(const std::string ipAddress);
 
-#if LIN
+#if LIN || APL
 extern bool IsDebuggerPresent();
 extern uint32_t GetTickCount();
+#endif
+
+#if APL
+#include <mach/mach_time.h>
+#include <time.h>
+int clock_gettime(clockid_t clk_id, struct timespec *tp);
 #endif
 
 #define SETTINGS_SECTION                    "settings"

@@ -4,6 +4,9 @@
 #if IBM
 #include <al.h>
 #include <alc.h>
+#elif APL
+#include <OpenAL/al.h>
+#include <OpenAL/alc.h>
 #elif LIN
 #include <AL/al.h>
 #include <AL/alc.h>
@@ -38,7 +41,7 @@ static ALCcontext *		my_ctx = NULL;
 //==============================================================
 //==============================================================
 struct chunk_header
-{ 
+{
 	int			id;
 	int			size;
 };
@@ -70,7 +73,7 @@ static char*	find_chunk(char * file_begin, char * file_end, int desired_id, int 
 		char * next = file_begin + chunk_size + sizeof(chunk_header);
 		if(next > file_end || next <= file_begin)
 			return NULL;
-		file_begin = next;		
+		file_begin = next;
 	}
 	return NULL;
 }
@@ -93,7 +96,7 @@ ALuint load_wave(const char * file_name)
 	FILE * fi = fopen(file_name,"rb");
 	if(fi == NULL)
 	{
-		LOG("WAVE file load failed - could not open.\n");	
+		LOG("WAVE file load failed - could not open.\n");
 		return 0;
 	}
 	fseek(fi,0,SEEK_END);
@@ -108,18 +111,18 @@ ALuint load_wave(const char * file_name)
 	}
 	if (fread(mem, 1, file_size, fi) != file_size)
 	{
-		LOG("WAVE file load failed - could not read file.\n");	
+		LOG("WAVE file load failed - could not read file.\n");
 		free(mem);
 		fclose(fi);
 		return 0;
 	}
 	fclose(fi);
 	char * mem_end = mem + file_size;
-	
+
 	// Second: find the RIFF chunk.  Note that by searching for RIFF both normal
 	// and reversed, we can automatically determine the endian swap situation for
 	// this file regardless of what machine we are on.
-	
+
 	int swapped = 0;
 	char * riff = find_chunk(mem, mem_end, RIFF_ID, 0);
 	if(riff == NULL)
@@ -130,11 +133,11 @@ ALuint load_wave(const char * file_name)
 		else
 			FAIL("Could not find RIFF chunk in wave file.\n")
 	}
-	
-	// The wave chunk isn't really a chunk at all. :-(  It's just a "WAVE" tag 
+
+	// The wave chunk isn't really a chunk at all. :-(  It's just a "WAVE" tag
 	// followed by more chunks.  This strikes me as totally inconsistent, but
 	// anyway, confirm the WAVE ID and move on.
-	
+
 	if (riff[0] != 'W' ||
 		riff[1] != 'A' ||
 		riff[2] != 'V' ||
@@ -144,9 +147,9 @@ ALuint load_wave(const char * file_name)
 	char * format = find_chunk(riff+4, chunk_end(riff,swapped), FMT_ID, swapped);
 	if(format == NULL)
 		FAIL("Could not find FMT  chunk in wave file.\n")
-	
+
 	// Find the format chunk, and swap the values if needed.  This gives us our real format.
-	
+
 	format_info * fmt = (format_info *) format;
 	if(swapped)
 	{
@@ -157,7 +160,7 @@ ALuint load_wave(const char * file_name)
 		fmt->block_align = SWAP_16(fmt->block_align);
 		fmt->bits_per_sample = SWAP_16(fmt->bits_per_sample);
 	}
-	
+
 	// Reject things we don't understand...expand this code to support weirder audio formats.
 	if(fmt->format != 1) FAIL("Wave file is not PCM format data.\n")
 	if(fmt->num_channels != 1 && fmt->num_channels != 2) FAIL("Must have mono or stereo sound.\n")
@@ -165,12 +168,12 @@ ALuint load_wave(const char * file_name)
 	char * data = find_chunk(riff+4, chunk_end(riff,swapped), DATA_ID, swapped) ;
 	if(data == NULL)
 		FAIL("I could not find the DATA chunk.\n")
-	
+
 	int sample_size = fmt->num_channels * fmt->bits_per_sample / 8;
 	int data_bytes = (int)(chunk_end(data,swapped) - data);
 	int data_samples = data_bytes / sample_size;
-	
-	// If the file is swapped and we have 16-bit audio, we need to endian-swap the audio too or we'll 
+
+	// If the file is swapped and we have 16-bit audio, we need to endian-swap the audio too or we'll
 	// get something that sounds just astoundingly bad!
 	if(fmt->bits_per_sample == 16 && swapped)
 	{
@@ -182,14 +185,14 @@ ALuint load_wave(const char * file_name)
 			++ptr;
 		}
 	}
-	
+
 	// Finally, the OpenAL crud.  Build a new OpenAL buffer and send the data to OpenAL, passing in
 	// OpenAL format enums based on the format chunk.
 	ALuint buf_id = 0;
 	alGenBuffers(1, &buf_id);
 	if(buf_id == 0) FAIL("Could not generate buffer id.\n");
-	
-	alBufferData(buf_id, fmt->bits_per_sample == 16 ? 
+
+	alBufferData(buf_id, fmt->bits_per_sample == 16 ?
 							(fmt->num_channels == 2 ? AL_FORMAT_STEREO16 : AL_FORMAT_MONO16) :
 							(fmt->num_channels == 2 ? AL_FORMAT_STEREO8 : AL_FORMAT_MONO8),
 					data, data_bytes, fmt->sample_rate);
@@ -213,11 +216,11 @@ static void __CHECK_ERR(const char * f, int l)
 void TSound::init()
 {
 	CHECK_ERR();
-	
+
 	// We have to save the old context and restore it later, so that we don't interfere with X-Plane
 	// and other plugins.
 	ALCcontext * old_ctx = alcGetCurrentContext();
-	
+
 	if(old_ctx == NULL)
 	{
 		LOG("I found no OpenAL, I will be the first to init.");
@@ -225,8 +228,8 @@ void TSound::init()
 		if(my_dev == NULL)
 		{
 			LOG("Could not open the default OpenAL device.");
-			return;		
-		}	
+			return;
+		}
 		my_ctx = alcCreateContext(my_dev, NULL);
 		if(my_ctx == NULL)
 		{
@@ -235,11 +238,11 @@ void TSound::init()
 			alcCloseDevice(my_dev);
 			my_dev = NULL;
 			LOG("Could not create a context.");
-			return;				
+			return;
 		}
-		
+
 		// Make our context current, so that OpenAL commands affect our, um, stuff.
-		
+
 		alcMakeContextCurrent(my_ctx);
 		LOG("created the context.",my_ctx);
 
@@ -249,12 +252,12 @@ void TSound::init()
 
 		alcGetIntegerv(NULL,ALC_MAJOR_VERSION,sizeof(major_version),&major_version);
 		alcGetIntegerv(NULL,ALC_MINOR_VERSION,sizeof(minor_version),&minor_version);
-		
+
 		LOG("OpenAL version   : %d.%d",major_version,minor_version);
 		LOG("OpenAL hardware  : %s", (al_hw?al_hw:"(none)"));
 		LOG("OpenAL extensions: %s", (al_ex?al_ex:"(none)"));
 		CHECK_ERR();
-	} 
+	}
 	else
 	{
 		LOG("found someone else's context 0x%08x.", old_ctx);
@@ -288,7 +291,7 @@ void TSound::destroy()
 	{
     deleteSound();
 	}
-	if(my_ctx) 
+	if(my_ctx)
 	{
 		LOG("deleting my context 0x%08x\n", my_ctx);
 		alcMakeContextCurrent(NULL);
@@ -313,7 +316,7 @@ void TSound::play(const char* pFileName)
   LOG("Loaded %d from %s\n", snd_buffer, pFileName);
   CHECK_ERR();
 
-  // Basic initialization code to play a sound: specify the buffer the source is playing, as well as some 
+  // Basic initialization code to play a sound: specify the buffer the source is playing, as well as some
   // sound parameters. This doesn't play the sound - it's just one-time initialization.
   alSourcei(snd_src, AL_BUFFER, snd_buffer);
   alSourcef(snd_src, AL_PITCH, 1.0f);
